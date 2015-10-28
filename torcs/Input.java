@@ -24,6 +24,8 @@ public class Input extends Controller implements KeyListener {
     
     private int gear = 1;
 
+    public boolean isRecording = false;
+    
     public Input() {
         keysDown = new HashMap<>();
         
@@ -81,6 +83,9 @@ public class Input extends Controller implements KeyListener {
                 break;
             case KeyEvent.VK_M:
                 gear = Math.min(6, gear + 1);
+                break;
+            case KeyEvent.VK_SPACE:
+                isRecording = !isRecording;
                 break;
             case KeyEvent.VK_ESCAPE:
                 System.exit(0);
