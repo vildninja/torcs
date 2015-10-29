@@ -21,6 +21,7 @@ import org.json.JSONObject;
 public class NeuralNetwork {
     
     public final Queue<Node> updateQueue;
+    public final Queue<Node> backQueue;
     
     private final HashMap<Node, Integer> data;
     
@@ -36,6 +37,11 @@ public class NeuralNetwork {
         {
             values.put(node, value);
             
+            Mark();
+        }
+        
+        private void Mark()
+        {
             if (!marked)
             {
                 marked = true;
@@ -56,26 +62,63 @@ public class NeuralNetwork {
         
         public double ReadValue()
         {
+            
             double value = 0;
             
             for (double v : values.values()) {
                 value += v;
             }
             
-            return 1 / Math.pow(1 + 0.5 * Math.pow(Math.E, value), 2);
+            double activator = 1 / Math.pow(1 + 0.5 * Math.pow(Math.E, -value), 2);
+            
+            //System.out.println("Node " + id + " value = " + value + " activator = " + activator + " from " + values.size() + " children");
+            
+            return activator;
         }
         
-        public void Backpropagate(Node node, double towards)
+        public void SetDesired(double desired, double rate)
         {
-            if (weights.containsKey(node))
-            {
-                weights.put(node, weights.get(node) + towards);
+            // make sure to update marked elements
+            Update();
+            
+            // clear backpropagation queue and start with this
+            backQueue.clear();
+            Backpropagate(this, desired, rate);
+            while (!backQueue.isEmpty()) {
+                backQueue.poll().Backpropagate(this, desired, rate);
+            }
+        }
+        
+        private void Backpropagate(Node top, double desired, double rate)
+        {
+            for (Node back : values.keySet()) {
+                if (back == null)
+                    continue;
+                
+                double before = desired - top.ReadValue();
+                values.put(back, back.ReadValue() * (back.weights.get(this) + rate));
+                Mark();
+                Update();
+                double after = desired - top.ReadValue();
+                
+                if (Math.abs(after) < Math.abs(before)) {
+                    back.weights.put(this, back.weights.get(this) + rate);
+                }
+                else {
+                    values.put(back, back.ReadValue() * (back.weights.get(this) - rate));
+                    back.weights.put(this, back.weights.get(this) - rate);
+                    Mark();
+                    Update();
+                }
+                
+                backQueue.add(back);
             }
         }
     }
 
     public NeuralNetwork(Node[] input, Node[] output, int layers) {
-        this.updateQueue = new LinkedList<>();
+        updateQueue = new LinkedList<>();
+        backQueue = new LinkedList<>();
         
         data = new HashMap<>();
         
@@ -106,6 +149,7 @@ public class NeuralNetwork {
                 for (Node l : last) {
                     l.weights.put(n, Math.random() * 2 - 1);
                 }
+                layer.add(n);
             }
             
             last = layer;

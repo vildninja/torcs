@@ -15,39 +15,27 @@ import scr.SensorModel;
  */
 public class SimpleNeuralNetwork extends Controller {
 
-    private final double[][] weights;
-    private final double[] range;
-    private final double[] output;
-    private final double[] controls;
+    private NeuralNetwork.Node[] input;
+    private NeuralNetwork.Node[] output;
+    private NeuralNetwork network;
     
-    //private NeuralNetwork.Node[] input;
-    //private NeuralNetwork.Node[] output;
-    //private NeuralNetwork network;
+    private final double[] range;
         
-    private final Input input;
+    private final Input controller;
     
     public SimpleNeuralNetwork()
     {
         // forward, left, right
-        controls = new double[3];
-        output = new double[3];
         
-        weights = new double[][] {
-                {2, 1, 1, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, 1, 1, 2},
-                {0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 1, 1, 1, 1, 2, 2, 2, 3, 3},
-                {3, 3, 2, 2, 2, 1, 1, 1, 1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-        };
+        controller = new Input();
+        
+        input = new NeuralNetwork.Node[20];
+        output = new NeuralNetwork.Node[3];
+        network = new NeuralNetwork(input, output, 1);
         
         range = new double[] {
             10, 11, 12, 14, 18, 22, 28, 40, 60, 200, 60, 40, 28, 22, 18, 14, 12, 11, 10
         };
-        
-        input = new Input();
-        
-        //NeuralNetwork.Node[] input = new NeuralNetwork.Node[20];
-        //NeuralNetwork.Node[] output = new NeuralNetwork.Node[3];
-        //NeuralNetwork network = new NeuralNetwork(input, output, 1);
-        
     }
     
     
@@ -57,37 +45,38 @@ public class SimpleNeuralNetwork extends Controller {
         
         double[] rays = sensors.getTrackEdgeSensors();
         
-        
-        for (int i = 0; i < controls.length; i++) {
-            output[i] = 0;
-        }
-        
         for (int i = 0; i < 19; i++) {
             double norm = Math.max(0, 1 - rays[i] / range[i]);
-            for (int j = 0; j < controls.length; j++) {
-                output[j] += norm * weights[j][i];
+            input[i].SetValue(null, norm);
+        }
+        input[19].SetValue(null, sensors.getAngleToTrackAxis());
+        
+        network.Update();
+        
+        
+        
+        Action action = controller.control(sensors);
+        
+        if (controller.isRecording)
+        {
+            output[0].SetDesired(action.accelerate, 0.01);
+            output[1].SetDesired(Math.max(action.steering, 0), 0.01);
+            output[2].SetDesired(Math.max(-action.steering, 0), 0.01);
+
+            if (count++%50 == 0)
+            {
+                String txt = output[0].ReadValue() + " " + output[1].ReadValue() + " " + output[2].ReadValue() +
+                        "\n" + action.accelerate + " " + Math.max(action.steering, 0) + " " + Math.max(-action.steering, 0);
+
+                System.out.println(txt);
             }
         }
-        
-        for (int i = 0; i < controls.length; i++) {
-            controls[i] = output[i];
-        }
-        
-        
-        if (count++%10 == 0)
+        else
         {
-            String txt = controls[0] + " " + controls[1] + " " + controls[2] +
-                    "\n" + rays[0] + " " + rays[3] + " " +
-                    rays[9] + " " + rays[15] + " " + rays[18];
-
-            System.out.println(txt);
+            action.accelerate = output[0].ReadValue();
+            action.steering = output[1].ReadValue() - output[2].ReadValue();
         }
         
-        
-        Action action = new Action();
-        action.gear = 2;
-        action.accelerate = controls[0];
-        action.steering = controls[1] - controls[2];
         return action;
     }
 
